@@ -7,6 +7,11 @@ pool:
 steps:
 - checkout: self
 
+- script: |
+    echo ===== FILES =====
+    dir
+  displayName: Check Files
+
 - task: CopyFilesOverSSH@0
   inputs:
     sshEndpoint: 'react-vm-ssh'
@@ -17,15 +22,31 @@ steps:
       style.css
     targetFolder: '/tmp/website'
     cleanTargetFolder: true
+    readyTimeout: '60000'
 
 - task: SSH@0
   inputs:
     sshEndpoint: 'react-vm-ssh'
     runOptions: 'commands'
     commands: |
+      whoami
+      pwd
+      ls -la /tmp/website
+
       sudo apt update
       sudo apt install nginx -y
+
+      sudo mkdir -p /var/www/html
       sudo rm -rf /var/www/html/*
+
       sudo cp -r /tmp/website/* /var/www/html/
-      sudo mv /var/www/html/calculator.html /var/www/html/index.html
+
+      if [ -f /var/www/html/calculator.html ]; then
+        sudo mv /var/www/html/calculator.html /var/www/html/index.html
+      fi
+
+      sudo systemctl enable nginx
       sudo systemctl restart nginx
+      sudo systemctl status nginx --no-pager
+
+      echo "Deployment Complete"
