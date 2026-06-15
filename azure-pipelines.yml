@@ -1,13 +1,16 @@
 trigger:
 - main
 
+# ========================
+# Linux agent (IMPORTANT)
+# ========================
 pool:
-  name: Default
+  vmImage: 'ubuntu-latest'
 
 steps:
 
 # ========================
-# 1. CHECK FILES
+# 1. CHECK REPO FILES
 # ========================
 - checkout: self
 
@@ -29,7 +32,7 @@ steps:
     cleanTargetFolder: true
 
 # ========================
-# 3. DEPLOY ON VM
+# 3. DEPLOY ON VM (NGINX)
 # ========================
 - task: SSH@0
   inputs:
@@ -38,15 +41,17 @@ steps:
     commands: |
       set -e
 
-      echo "===== INSTALL NGINX ====="
+      echo "===== UPDATE SYSTEM ====="
       sudo apt-get update -y
+
+      echo "===== INSTALL NGINX ====="
       sudo apt-get install -y nginx
 
       echo "===== CLEAN WEB ROOT ====="
       sudo rm -rf /var/www/html/*
       sudo mkdir -p /var/www/html
 
-      echo "===== COPY FILES ====="
+      echo "===== DEPLOY FILES ====="
       sudo cp -r /tmp/website/* /var/www/html/
 
       echo "===== SET INDEX FILE ====="
@@ -56,17 +61,17 @@ steps:
         sudo mv /var/www/html/calculator.html /var/www/html/index.html
       fi
 
-      echo "===== FIX PERMISSIONS ====="
+      echo "===== PERMISSIONS FIX ====="
       sudo chmod -R 755 /var/www/html
 
-      echo "===== ENABLE & RESTART NGINX ====="
+      echo "===== START NGINX ====="
       sudo systemctl enable nginx
       sudo systemctl restart nginx
 
-      echo "===== STATUS ====="
+      echo "===== STATUS CHECK ====="
       sudo systemctl status nginx --no-pager
 
       echo "===== PORT CHECK ====="
       sudo ss -tulnp | grep :80 || true
 
-      echo "===== DONE ====="
+      echo "===== DEPLOY DONE ====="
