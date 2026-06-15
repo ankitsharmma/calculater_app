@@ -5,18 +5,15 @@ pool:
   name: Default
 
 steps:
-# Checkout repository
 - checkout: self
 
-# Verify files on Windows Agent
 - script: |
     echo ===== FILES IN REPOSITORY =====
-    dir
+    dir "$(System.DefaultWorkingDirectory)"
   displayName: 'Verify Files'
 
-# Copy website files to Ubuntu VM
 - task: CopyFilesOverSSH@0
-  displayName: 'Copy Website Files to VM'
+  displayName: 'Copy Website Files'
   inputs:
     sshEndpoint: 'react-vm-ssh'
     sourceFolder: '$(System.DefaultWorkingDirectory)'
@@ -28,64 +25,31 @@ steps:
     cleanTargetFolder: true
     overwrite: true
 
-# Deploy website on Ubuntu VM using Nginx
 - task: SSH@0
-  displayName: 'Deploy Website on Nginx'
+  displayName: 'Deploy Website'
   inputs:
     sshEndpoint: 'react-vm-ssh'
     runOptions: 'commands'
     commands: |
-      set -e
-
-      echo "===== INSTALL NGINX ====="
       sudo apt-get update
       sudo apt-get install -y nginx
 
-      echo "===== VERIFY COPIED FILES ====="
+      echo "===== FILES IN /tmp/website ====="
       ls -la /tmp/website
 
-      echo "===== PREPARE WEB DIRECTORY ====="
       sudo mkdir -p /var/www/html
       sudo rm -rf /var/www/html/*
 
-      echo "===== COPY WEBSITE FILES ====="
       sudo cp -r /tmp/website/* /var/www/html/
 
-      echo "===== RENAME calculator.html TO index.html ====="
-      if [ -f /var/www/html/calculator.html ]; then
-          sudo mv /var/www/html/calculator.html /var/www/html/index.html
-      fi
+      sudo mv /var/www/html/calculator.html /var/www/html/index.html || true
 
-      echo "===== SET PERMISSIONS ====="
       sudo chown -R www-data:www-data /var/www/html
       sudo chmod -R 755 /var/www/html
 
-      echo "===== CONFIGURE NGINX ====="
-      sudo tee /etc/nginx/sites-available/default > /dev/null <<'EOF'
-      server {
-          listen 80 default_server;
-          listen [::]:80 default_server;
-
-          root /var/www/html;
-          index index.html index.htm;
-
-          server_name _;
-
-          location / {
-              try_files $uri $uri/ =404;
-          }
-      }
-      EOF
-
-      echo "===== TEST NGINX CONFIGURATION ====="
       sudo nginx -t
-
-      echo "===== ENABLE AND RESTART NGINX ====="
       sudo systemctl enable nginx
       sudo systemctl restart nginx
 
-      echo "===== NGINX STATUS ====="
-      sudo systemctl status nginx --no-pager
-
-      echo "===== DEPLOYED FILES ====="
+      echo "===== FILES IN /var/www/html ====="
       ls -la /var/www/html
