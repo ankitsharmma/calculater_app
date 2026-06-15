@@ -5,49 +5,68 @@ pool:
   name: Default
 
 steps:
+
+# ========================
+# 1. CHECK FILES
+# ========================
 - checkout: self
 
 - script: |
-    echo ===== FILES IN REPO =====
-    dir
+    echo "===== FILES IN REPO ====="
+    ls -R
   displayName: Verify Files
 
+# ========================
+# 2. COPY FILES TO VM
+# ========================
 - task: CopyFilesOverSSH@0
   inputs:
     sshEndpoint: 'react-vm-ssh'
     sourceFolder: '$(System.DefaultWorkingDirectory)'
     contents: |
-      *.html
-      *.js
-      *.css
+      **/*
     targetFolder: '/tmp/website'
     cleanTargetFolder: true
 
+# ========================
+# 3. DEPLOY ON VM
+# ========================
 - task: SSH@0
   inputs:
     sshEndpoint: 'react-vm-ssh'
     runOptions: 'commands'
     commands: |
-      sudo apt-get update
+      set -e
+
+      echo "===== INSTALL NGINX ====="
+      sudo apt-get update -y
       sudo apt-get install -y nginx
 
-      sudo mkdir -p /var/www/html
+      echo "===== CLEAN WEB ROOT ====="
       sudo rm -rf /var/www/html/*
+      sudo mkdir -p /var/www/html
 
+      echo "===== COPY FILES ====="
       sudo cp -r /tmp/website/* /var/www/html/
 
-      if [ -f /var/www/html/calculator.html ]; then
+      echo "===== SET INDEX FILE ====="
+      if [ -f /var/www/html/index.html ]; then
+        echo "index.html already exists"
+      elif [ -f /var/www/html/calculator.html ]; then
         sudo mv /var/www/html/calculator.html /var/www/html/index.html
       fi
 
+      echo "===== FIX PERMISSIONS ====="
+      sudo chmod -R 755 /var/www/html
+
+      echo "===== ENABLE & RESTART NGINX ====="
       sudo systemctl enable nginx
       sudo systemctl restart nginx
 
-      echo "===== NGINX STATUS ====="
+      echo "===== STATUS ====="
       sudo systemctl status nginx --no-pager
 
-      echo "===== WEBSITE FILES ====="
-      ls -la /var/www/html
-
-      echo "===== PORT 80 ====="
+      echo "===== PORT CHECK ====="
       sudo ss -tulnp | grep :80 || true
+
+      echo "===== DONE ====="
