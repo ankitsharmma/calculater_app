@@ -1,0 +1,31 @@
+trigger:
+- main
+
+pool:
+  name: Default
+
+steps:
+- checkout: self
+
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: 'react-vm-ssh'
+    sourceFolder: '$(System.DefaultWorkingDirectory)'
+    contents: |
+      calculator.html
+      script.js
+      style.css
+    targetFolder: '/tmp/website'
+    cleanTargetFolder: true
+
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'react-vm-ssh'
+    runOptions: 'commands'
+    commands: |
+      sudo apt update
+      sudo apt install nginx -y
+      sudo rm -rf /var/www/html/*
+      sudo cp -r /tmp/website/* /var/www/html/
+      sudo mv /var/www/html/calculator.html /var/www/html/index.html
+      sudo systemctl restart nginx
