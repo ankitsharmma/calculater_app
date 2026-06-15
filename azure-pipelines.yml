@@ -1,88 +1,145 @@
 trigger:
+
 - main
 
+
+
 pool:
+
   name: Default
 
+
+
 steps:
+
 # Checkout source code
+
 - checkout: self
 
+
+
 # Verify files on Windows Agent
+
 - script: |
+
     echo ===== FILES IN WORKSPACE =====
+
     dir /s "$(System.DefaultWorkingDirectory)"
+
   displayName: 'Verify Files'
 
-# Copy all files to Ubuntu VM
+
+
+# Copy files to Ubuntu VM
+
 - task: CopyFilesOverSSH@0
+
   displayName: 'Copy Website Files to VM'
+
   inputs:
+
     sshEndpoint: 'react-vm-ssh'
+
     sourceFolder: '$(System.DefaultWorkingDirectory)'
-    contents: '**'
+
+    contents: |
+
+      calculater.html
+
+      script.js
+
+      style.css
+
     targetFolder: '/tmp/website'
+
     cleanTargetFolder: true
+
     overwrite: true
 
-# Deploy website on Ubuntu VM using Nginx
+
+
+# Deploy website on Ubuntu VM
+
 - task: SSH@0
+
   displayName: 'Deploy Website on Nginx'
+
   inputs:
+
     sshEndpoint: 'react-vm-ssh'
+
     runOptions: 'commands'
+
     commands: |
+
       set -e
 
+
+
       echo "===== INSTALL NGINX ====="
+
       sudo apt-get update
+
       sudo apt-get install -y nginx
 
+
+
       echo "===== FILES IN /tmp/website ====="
+
       ls -la /tmp/website
 
+
+
       echo "===== PREPARE WEB DIRECTORY ====="
+
       sudo mkdir -p /var/www/html
+
       sudo rm -rf /var/www/html/*
 
+
+
       echo "===== COPY WEBSITE FILES ====="
+
       sudo cp -r /tmp/website/* /var/www/html/
 
-      echo "===== RENAME calculator.html TO index.html ====="
-      if [ -f /var/www/html/calculator.html ]; then
-        sudo mv /var/www/html/calculator.html /var/www/html/index.html
-      fi
+
+
+      echo "===== RENAME HTML FILE ====="
+
+      sudo mv /var/www/html/calculater.html /var/www/html/index.html
+
+
 
       echo "===== SET PERMISSIONS ====="
+
       sudo chown -R www-data:www-data /var/www/html
+
       sudo chmod -R 755 /var/www/html
 
-      echo "===== CONFIGURE NGINX ====="
-      sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOF
-      server {
-          listen 80 default_server;
-          listen [::]:80 default_server;
 
-          root /var/www/html;
-          index index.html index.htm;
 
-          server_name _;
+      echo "===== TEST NGINX ====="
 
-          location / {
-              try_files \$uri \$uri/ =404;
-          }
-      }
-      EOF'
-
-      echo "===== TEST NGINX CONFIGURATION ====="
       sudo nginx -t
 
+
+
       echo "===== RESTART NGINX ====="
+
       sudo systemctl enable nginx
+
       sudo systemctl restart nginx
 
+
+
       echo "===== NGINX STATUS ====="
+
       sudo systemctl status nginx --no-pager
 
+
+
       echo "===== DEPLOYED FILES ====="
+
       ls -la /var/www/html
+
+ 
